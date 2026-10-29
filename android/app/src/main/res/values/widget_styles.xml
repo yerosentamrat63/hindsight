@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Shared type for the home-screen widgets. Same faces and tracking as
+         the app: Bricolage for numbers and headings, JetBrains Mono for
+         labels and metadata.
+
+         Static weight instances instead of android:fontVariationSettings,
+         which aapt2 cannot compile inside a style. -->
+    <style name="WidgetLabel">
+        <item name="android:fontFamily">@font/jetbrains_mono_400</item>
+        <item name="android:textSize">9sp</item>
+        <item name="android:textColor">#A8A398</item>
+        <item name="android:letterSpacing">0.1</item>
+        <item name="android:textAllCaps">true</item>
+        <item name="android:includeFontPadding">false</item>
+    </style>
+
+    <style name="WidgetMono">
+        <item name="android:fontFamily">@font/jetbrains_mono_400</item>
+        <item name="android:textSize">10sp</item>
+        <item name="android:textColor">#A8A398</item>
+        <item name="android:includeFontPadding">false</item>
+    </style>
+
+    <style name="WidgetMonoBold" parent="WidgetMono">
+        <item name="android:fontFamily">@font/jetbrains_mono_700</item>
+        <item name="android:textColor">#F3EFE6</item>
+    </style>
+
+    <style name="WidgetNumber">
+        <item name="android:fontFamily">@font/bricolage_800</item>
+        <item name="android:textColor">#F3EFE6</item>
+        <item name="android:letterSpacing">-0.04</item>
+        <item name="android:includeFontPadding">false</item>
+    </style>
+
+    <style name="WidgetTitle">
+        <item name="android:fontFamily">@font/bricolage_600</item>
+        <item name="android:textColor">#F3EFE6</item>
+        <item name="android:textSize">13sp</item>
+        <item name="android:includeFontPadding">false</item>
+    </style>
+</resources>
