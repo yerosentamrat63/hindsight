@@ -11,7 +11,7 @@ the optional verdict writer is the only thing that talks to the internet.
 
 ## Download
 
-**[Download the latest APK →](../../releases/latest)**
+**[Download the latest APK →](https://github.com/yerosentamrat63/hindsight/releases/latest)**
 
 | File | Size | Use it for |
 | --- | --- | --- |
