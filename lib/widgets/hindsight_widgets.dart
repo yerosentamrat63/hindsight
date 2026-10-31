@@ -662,14 +662,11 @@ class WeekWidget extends StatelessWidget {
   final WidgetData data;
 
   static const Size size = Size(360, 360);
-  static const double _chartH = 110;
-  static const double _maxBar = 90;
 
   @override
   Widget build(BuildContext context) {
     final days = data.weekDayWastedMin;
     final peak = math.max(days.fold<int>(0, math.max), data.limitMin);
-    final k = peak == 0 ? 0.0 : _maxBar / peak;
     final less = data.weekDeltaMin <= 0;
 
     return _Card(
@@ -718,34 +715,46 @@ class WeekWidget extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 16),
-          SizedBox(
-            height: _chartH,
-            child: Stack(
-              children: [
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.end,
+          Expanded(
+            child: LayoutBuilder(
+              builder: (context, box) {
+                // A 4x4 cell is taller than the square board, so the bars take
+                // the extra height instead of leaving a gap before the pill.
+                final maxBar = math.max(box.maxHeight, 40.0);
+                final k = peak == 0 ? 0.0 : maxBar / peak;
+                return Stack(
                   children: [
-                    for (var i = 0; i < days.length; i++) ...[
-                      if (i > 0) const SizedBox(width: 8),
-                      Expanded(
-                        child: Container(
-                          height: days[i] * k,
-                          decoration: BoxDecoration(
-                            color: days[i] <= data.limitMin ? _lime : _orange,
-                            borderRadius: const BorderRadius.only(
-                              topLeft: Radius.circular(6),
-                              topRight: Radius.circular(6),
-                              bottomLeft: Radius.circular(2),
-                              bottomRight: Radius.circular(2),
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.end,
+                      children: [
+                        for (var i = 0; i < days.length; i++) ...[
+                          if (i > 0) const SizedBox(width: 8),
+                          Expanded(
+                            child: Container(
+                              height: days[i] * k,
+                              decoration: BoxDecoration(
+                                color: days[i] <= data.limitMin ? _lime : _orange,
+                                borderRadius: const BorderRadius.only(
+                                  topLeft: Radius.circular(6),
+                                  topRight: Radius.circular(6),
+                                  bottomLeft: Radius.circular(2),
+                                  bottomRight: Radius.circular(2),
+                                ),
+                              ),
                             ),
                           ),
-                        ),
-                      ),
-                    ],
+                        ],
+                      ],
+                    ),
+                    Positioned(
+                      left: 0,
+                      right: 0,
+                      bottom: data.limitMin * k,
+                      child: const _DashedLine(),
+                    ),
                   ],
-                ),
-                Positioned(left: 0, right: 0, bottom: data.limitMin * k, child: const _DashedLine()),
-              ],
+                );
+              },
             ),
           ),
           const SizedBox(height: 6),
@@ -767,7 +776,7 @@ class WeekWidget extends StatelessWidget {
               ],
             ],
           ),
-          const Spacer(),
+          const SizedBox(height: 14),
           Container(
             constraints: const BoxConstraints(minHeight: 52),
             padding: const EdgeInsets.fromLTRB(16, 0, 6, 0),

@@ -103,8 +103,10 @@ class _WidgetPngHostState extends State<WidgetPngHost> {
         paths[key] = file.path;
       }
       if (paths.isNotEmpty) await HomeWidgets.publishImages(paths);
-    } catch (_) {
-      // A launcher widget is a nicety; never let it break a refresh.
+    } catch (error, stack) {
+      // A launcher widget is a nicety; never let it break a refresh, but a
+      // silent failure here means a stale picture on the home screen.
+      debugPrint('Hindsight: widget capture failed: $error\n$stack');
     } finally {
       if (mounted) setState(() => _data = null);
       _busy = false;
