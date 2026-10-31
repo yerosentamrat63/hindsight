@@ -1,83 +1,16 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- 2x2 · verdict: today's one-liner plus the voice it was written in. -->
+<!-- 2x2 · verdict, drawn in Dart. See widget_ring.xml for why this is an
+     image and not a layout of TextViews. -->
 <FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:id="@+id/widget_root"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:padding="10dp">
+    android:padding="12dp">
 
-    <LinearLayout
+    <ImageView
+        android:id="@+id/widget_image"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        android:background="@drawable/widget_card"
-        android:orientation="vertical"
-        android:paddingStart="15dp"
-        android:paddingTop="14dp"
-        android:paddingEnd="15dp"
-        android:paddingBottom="12dp">
-
-        <LinearLayout
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:gravity="center_vertical"
-            android:orientation="horizontal">
-
-            <ImageView
-                android:layout_width="14dp"
-                android:layout_height="14dp"
-                android:src="@drawable/ic_widget_recycle"
-                android:contentDescription="@null" />
-
-            <TextView
-                style="@style/WidgetLabel"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginStart="6dp"
-                android:text="Verdict" />
-        </LinearLayout>
-
-        <TextView
-            android:id="@+id/verdict_text"
-            style="@style/WidgetNumber"
-            android:layout_width="match_parent"
-            android:layout_height="0dp"
-            android:layout_weight="1"
-            android:layout_marginTop="8dp"
-            android:text="The verdict lands tonight."
-            android:textSize="19sp"
-            android:lineSpacingMultiplier="1.05"
-            android:maxLines="4"
-            android:ellipsize="end" />
-
-        <LinearLayout
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="8dp"
-            android:gravity="center_vertical"
-            android:orientation="horizontal">
-
-            <TextView
-                android:id="@+id/verdict_tone"
-                style="@style/WidgetMono"
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:text="Brutal roast"
-                android:maxLines="1"
-                android:ellipsize="end" />
-
-            <FrameLayout
-                android:layout_width="26dp"
-                android:layout_height="26dp"
-                android:background="@drawable/widget_circle_cream">
-
-                <ImageView
-                    android:layout_width="13dp"
-                    android:layout_height="13dp"
-                    android:layout_gravity="center"
-                    android:src="@drawable/ic_widget_arrow"
-                    android:contentDescription="@null" />
-            </FrameLayout>
-        </LinearLayout>
-    </LinearLayout>
+        android:scaleType="fitXY"
+        android:contentDescription="@string/widget_verdict_description" />
 </FrameLayout>

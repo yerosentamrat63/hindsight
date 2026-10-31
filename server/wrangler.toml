@@ -1,0 +1,10 @@
+name = "hindsight-verdict"
+main = "worker.js"
+compatibility_date = "2026-10-01"
+
+# Optional daily counter so the free Groq quota cannot be drained by one person
+# who found the URL. Create the namespace, then uncomment:
+#   wrangler kv namespace create LIMIT
+# [[kv_namespaces]]
+# binding = "LIMIT"
+# id = "<paste the id wrangler prints>"

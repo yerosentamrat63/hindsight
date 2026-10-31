@@ -52,3 +52,8 @@ app.*.map.json
 # Local symbols from --split-debug-info
 /app.*.symbols/
 /build/symbols/
+
+# Cloudflare Worker: local cache and dev secrets
+/server/.wrangler/
+/server/.dev.vars
+/server/node_modules/

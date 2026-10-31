@@ -13,7 +13,9 @@ import 'data/reminders.dart';
 import 'data/usage_repository.dart';
 import 'format.dart';
 import 'models.dart';
+import 'widgets/hindsight_widgets.dart';
 import 'widgets/home_widgets.dart';
+import 'widgets/widget_png.dart';
 
 class AppState extends ChangeNotifier {
   AppState({UsageRepository? repo, VerdictService? verdicts})
@@ -68,11 +70,15 @@ class AppState extends ChangeNotifier {
     if (settings.setupComplete && settings.notifyEnabled && !notificationsAllowed) {
       await Reminders.requestPermission();
     }
+    // The launcher widgets are redrawn by a bitmap pass on the Android UI
+    // thread. Do that while the launch animation is holding its last frame
+    // rather than during the cross-fade into the home screen, where it showed
+    // up as a stutter at the very end of the animation.
+    await _publishWidgets();
+    await _syncReminder();
     loading = false;
     notifyListeners();
     if (!_ready.isCompleted) _ready.complete();
-    await _publishWidgets();
-    await _syncReminder();
   }
 
   // ----------------------------------------------------------------- widgets
@@ -118,7 +124,13 @@ class AppState extends ChangeNotifier {
     };
   }
 
-  Future<void> _publishWidgets() => HomeWidgets.publish(widgetSnapshot());
+  Future<void> _publishWidgets() async {
+    final snapshot = widgetSnapshot();
+    // The native layouts only carry an image, so draw the widgets first and
+    // then ask the launcher to reload them.
+    await WidgetPngHost.push(widgetDataFromSnapshot(snapshot));
+    await HomeWidgets.publish(snapshot);
+  }
 
   void _loadSettings() {
     final raw = _prefs?.getString(_settingsKey);

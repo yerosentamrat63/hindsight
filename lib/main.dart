@@ -14,6 +14,7 @@ import 'store.dart';
 import 'theme.dart';
 import 'widgets/coachmark.dart';
 import 'widgets/hindsight_launch.dart';
+import 'widgets/widget_png.dart';
 import 'widgets/ui.dart';
 
 void main() {
@@ -43,6 +44,10 @@ class HindsightApp extends StatelessWidget {
       title: 'Hindsight',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.build(),
+      // The home-screen widgets are painted inside this tree and captured to
+      // PNGs, so they keep the app's fonts (see widgets/widget_png.dart).
+      builder: (context, child) =>
+          WidgetPngHost(child: child ?? const SizedBox.shrink()),
       home: const AppBoot(),
     );
   }

@@ -32,8 +32,9 @@ class AiEndpoint {
   final String baseUrl;
 
   String get url {
-    final raw =
-        baseUrl.trim().isEmpty ? provider.defaultBaseUrl : baseUrl.trim();
+    final raw = baseUrl.trim().isEmpty
+        ? provider.defaultBaseUrl
+        : baseUrl.trim();
     return raw.replaceAll(RegExp(r'/+$'), '');
   }
 }
@@ -53,23 +54,23 @@ class VerdictService {
   /// The built-in instruction for each voice. Also shown in the prompt editor
   /// so a user who writes their own can see what they are replacing.
   static String builtInVoice(Tone tone) => switch (tone) {
-        Tone.coach =>
-          'You are a warm but honest coach. Point at the time that got away, '
-              'then show the concrete thing it could have built. No shame, no '
-              'exclamation marks, no moralising.',
-        Tone.roast =>
-          'You are a brutally funny roast comedian holding the user\'s screen '
-              'time and the goal they claim to be working towards. Be harsh, '
-              'specific and quotable: go for the gap between what they say they '
-              'want and what they actually did with today. Name the app and the '
-              'number. Mock the scroll, the excuses and the "just five more '
-              'minutes". Never mock their body, family, money or worth, no '
-              'slurs, not cruel for the sake of cruelty. No exclamation marks.',
-        Tone.future =>
-          'You are the user, five years in the future, writing back to now. '
-              'Calm, specific, quietly disappointed. You remember this exact '
-              'day and what it cost. No exclamation marks.',
-      };
+    Tone.coach =>
+      'You are a warm but honest coach. Point at the time that got away, '
+          'then show the concrete thing it could have built. No shame, no '
+          'exclamation marks, no moralising.',
+    Tone.roast =>
+      'You are a brutally funny roast comedian holding the user\'s screen '
+          'time and the goal they claim to be working towards. Be harsh, '
+          'specific and quotable: go for the gap between what they say they '
+          'want and what they actually did with today. Name the app and the '
+          'number. Mock the scroll, the excuses and the "just five more '
+          'minutes". Never mock their body, family, money or worth, no '
+          'slurs, not cruel for the sake of cruelty. No exclamation marks.',
+    Tone.future =>
+      'You are the user, five years in the future, writing back to now. '
+          'Calm, specific, quietly disappointed. You remember this exact '
+          'day and what it cost. No exclamation marks.',
+  };
 
   /// The rules that keep the output usable, whatever voice is in charge.
   static const _rules = '''
@@ -122,19 +123,29 @@ Rules:
     try {
       final root = jsonDecode(res.body) as Map<String, dynamic>;
       final ids = switch (ep.provider.style) {
-        ApiStyle.openai => (root['data'] as List)
-            .map((m) => (m as Map)['id'].toString())
-            .where((id) => !nonChatModels.any(id.toLowerCase().contains)),
-        ApiStyle.anthropic => (root['data'] as List)
-            .map((m) => (m as Map)['id'].toString())
-            .where((id) => id.isNotEmpty),
-        ApiStyle.gemini => (root['models'] as List).where((m) {
-            final map = m as Map;
-            final methods = (map['supportedGenerationMethods'] as List?)
-                    ?.map((e) => e.toString()) ??
-                const <String>[];
-            return methods.contains('generateContent');
-          }).map((m) => (m as Map)['name'].toString().replaceFirst('models/', '')),
+        ApiStyle.openai =>
+          (root['data'] as List)
+              .map((m) => (m as Map)['id'].toString())
+              .where((id) => !nonChatModels.any(id.toLowerCase().contains)),
+        ApiStyle.anthropic =>
+          (root['data'] as List)
+              .map((m) => (m as Map)['id'].toString())
+              .where((id) => id.isNotEmpty),
+        ApiStyle.gemini =>
+          (root['models'] as List)
+              .where((m) {
+                final map = m as Map;
+                final methods =
+                    (map['supportedGenerationMethods'] as List?)?.map(
+                      (e) => e.toString(),
+                    ) ??
+                    const <String>[];
+                return methods.contains('generateContent');
+              })
+              .map(
+                (m) =>
+                    (m as Map)['name'].toString().replaceFirst('models/', ''),
+              ),
       }.toSet().toList();
 
       if (ids.isEmpty) {
@@ -164,15 +175,10 @@ Rules:
       case ApiStyle.anthropic:
         return _client.get(
           Uri.parse('$base/models'),
-          headers: {
-            'x-api-key': key,
-            'anthropic-version': '2023-06-01',
-          },
+          headers: {'x-api-key': key, 'anthropic-version': '2023-06-01'},
         );
       case ApiStyle.gemini:
-        return _client.get(
-          Uri.parse('$base/models?pageSize=1000&key=$key'),
-        );
+        return _client.get(Uri.parse('$base/models?pageSize=1000&key=$key'));
     }
   }
 
@@ -200,13 +206,19 @@ Rules:
   }) async {
     final base = _base(ep);
     final system = _system(ctx, persona);
-    final user = '${ctx.statsBlock()}\n\n'
+    final user =
+        '${ctx.statsBlock()}\n\n'
         "Write today's verdict in the requested voice.";
 
     http.Response res;
     try {
-      res = await _chat(base, ep, system, user, ctx.tone)
-          .timeout(const Duration(seconds: 45));
+      res = await _chat(
+        base,
+        ep,
+        system,
+        user,
+        ctx.tone,
+      ).timeout(const Duration(seconds: 45));
     } on TimeoutException {
       throw VerdictException(
         '${ep.provider.label} took too long to answer. Using the offline verdict.',
@@ -232,7 +244,9 @@ Rules:
     final oneLiner = parsed['one_liner']?.toString().trim();
 
     if (headline.isEmpty || body.isEmpty) {
-      throw VerdictException('${ep.provider.label} sent back an empty verdict.');
+      throw VerdictException(
+        '${ep.provider.label} sent back an empty verdict.',
+      );
     }
 
     return Verdict(
@@ -263,8 +277,7 @@ Rules:
           },
           body: jsonEncode({
             'model': ep.model,
-            if (ep.provider == AiProvider.groq && _reasons(ep.model))
-              'reasoning_effort': 'low',
+            if (_reasons(ep.model)) 'reasoning_effort': 'low',
             'temperature': tone == Tone.roast ? 1.05 : 0.75,
             // Reasoning models need room to think before they answer.
             'max_tokens': 1600,
@@ -346,9 +359,11 @@ Rules:
           }
           final parts = (root['content'] as List?) ?? const [];
           return parts
-              .map((p) => (p as Map)['type'] == 'text'
-                  ? (p['text'] ?? '').toString()
-                  : '')
+              .map(
+                (p) => (p as Map)['type'] == 'text'
+                    ? (p['text'] ?? '').toString()
+                    : '',
+              )
               .join()
               .trim();
         case ApiStyle.gemini:
@@ -430,7 +445,11 @@ Rules:
       );
     }
     if (status == 429) {
-      return VerdictException('$name says you are out of requests for now.');
+      // The shared proxy sends its own wording when the daily cap is hit.
+      final detail = _errorMessage(body);
+      return VerdictException(
+        detail ?? '$name says you are out of requests for now.',
+      );
     }
     if (status == 400) {
       final detail = _errorMessage(body);
@@ -440,7 +459,9 @@ Rules:
             : '$name rejected the request: $detail',
       );
     }
-    return VerdictException('$name returned $status. Using the offline verdict.');
+    return VerdictException(
+      '$name returned $status. Using the offline verdict.',
+    );
   }
 
   /// Every provider here puts the useful part of a 4xx in `error.message`.

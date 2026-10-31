@@ -167,11 +167,38 @@ release falls back to the debug key. **Keep the keystore and its passwords
 safe** — Android will not install an update signed with a different key, so
 losing them means every user has to uninstall and reinstall.
 
+### A shared writer for friends
+
+A build can carry the shared writer so nobody has to paste a key. It talks to
+the small Cloudflare Worker in `server/`, which holds one Groq key:
+
+```bash
+cd server
+npm install -g wrangler
+wrangler login
+wrangler secret put GROQ_API_KEY   # paste gsk_…
+wrangler deploy
+```
+
+Then build the app pointing at it:
+
+```bash
+flutter build apk --release \
+  --dart-define=HINDSIGHT_PROXY=https://hindsight-verdict.<you>.workers.dev/v1
+```
+
+That build shows a **Hindsight** writer in Settings that needs no key, and a
+fresh install starts on it. A build without the define is unchanged: bring your
+own key, or the offline verdict. The proxy pins the two gpt-oss models, clamps
+`max_tokens` and can cap the day, because Groq's free tier is about 100–130
+verdicts per day — and a key shipped inside an APK is a key anyone can extract.
+Your own Groq key is fine to use here: the proxy is the only place it lives.
+
 ## Tests
 
 ```bash
 flutter analyze   # no issues
-flutter test      # 37 passing
+flutter test      # 40 passing
 ```
 
 Widget tests render every tab, onboarding, settings, the verdict writer, the

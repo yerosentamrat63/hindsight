@@ -50,9 +50,9 @@ class _PromptScreenState extends State<PromptScreen> {
   Future<void> _save() async {
     setState(() => _busy = true);
     FocusScope.of(context).unfocus();
-    await context.read<AppState>().setVoicePrompts(
-      {for (final entry in _fields.entries) entry.key: entry.value.text},
-    );
+    await context.read<AppState>().setVoicePrompts({
+      for (final entry in _fields.entries) entry.key: entry.value.text,
+    });
     if (!mounted) return;
     setState(() => _busy = false);
     Navigator.of(context).pop();
@@ -78,17 +78,27 @@ class _PromptScreenState extends State<PromptScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text('Tell it how to say it',
-                          style: display(30,
-                              weight: 800, tracking: -0.035, height: 1.05)),
+                      Text(
+                        'Tell it how to say it',
+                        style: display(
+                          30,
+                          weight: 800,
+                          tracking: -0.035,
+                          height: 1.05,
+                        ),
+                      ),
                       const SizedBox(height: 10),
                       Text(
                         'Write the voice the AI should use, per tone. Leave a box '
                         'empty and the built-in voice is used. Your numbers and '
                         'milestones are always counted on the phone, so a custom '
                         'prompt cannot invent them.',
-                        style: display(15,
-                            weight: 400, color: C.muted, height: 1.45),
+                        style: display(
+                          15,
+                          weight: 400,
+                          color: C.muted,
+                          height: 1.45,
+                        ),
                       ),
                       const SizedBox(height: 20),
                       Row(
@@ -119,23 +129,33 @@ class _PromptScreenState extends State<PromptScreen> {
                         cursorColor: C.lime,
                         onChanged: (_) => setState(() {}),
                         decoration: InputDecoration(
-                          hintText: 'e.g. Sound like a disappointed football '
+                          hintText:
+                              'e.g. Sound like a disappointed football '
                               'coach. Short sentences. Name the app and the '
                               'minutes, then say what the time should have '
                               'bought. No jokes, no exclamation marks.',
-                          hintStyle: display(15,
-                              weight: 400, color: C.faint, height: 1.4),
+                          hintStyle: display(
+                            15,
+                            weight: 400,
+                            color: C.faint,
+                            height: 1.4,
+                          ),
                           filled: true,
                           fillColor: C.surface,
                           contentPadding: const EdgeInsets.all(16),
                           enabledBorder: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(16),
-                            borderSide:
-                                const BorderSide(color: C.border, width: 1.5),
+                            borderSide: const BorderSide(
+                              color: C.border,
+                              width: 1.5,
+                            ),
                           ),
                           focusedBorder: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(16),
-                            borderSide: const BorderSide(color: C.ink, width: 1.5),
+                            borderSide: const BorderSide(
+                              color: C.ink,
+                              width: 1.5,
+                            ),
                           ),
                         ),
                       ),
@@ -150,10 +170,17 @@ class _PromptScreenState extends State<PromptScreen> {
                               },
                               behavior: HitTestBehavior.opaque,
                               child: Padding(
-                                padding: const EdgeInsets.symmetric(vertical: 8),
-                                child: Text('Start from the built-in voice',
-                                    style: mono(12,
-                                        color: C.lime, tracking: 0.02)),
+                                padding: const EdgeInsets.symmetric(
+                                  vertical: 8,
+                                ),
+                                child: Text(
+                                  'Start from the built-in voice',
+                                  style: mono(
+                                    12,
+                                    color: C.lime,
+                                    tracking: 0.02,
+                                  ),
+                                ),
                               ),
                             ),
                           ),
@@ -165,10 +192,17 @@ class _PromptScreenState extends State<PromptScreen> {
                               },
                               behavior: HitTestBehavior.opaque,
                               child: Padding(
-                                padding: const EdgeInsets.symmetric(vertical: 8),
-                                child: Text('Clear',
-                                    style: mono(12,
-                                        color: C.orange, tracking: 0.02)),
+                                padding: const EdgeInsets.symmetric(
+                                  vertical: 8,
+                                ),
+                                child: Text(
+                                  'Clear',
+                                  style: mono(
+                                    12,
+                                    color: C.orange,
+                                    tracking: 0.02,
+                                  ),
+                                ),
                               ),
                             ),
                         ],
@@ -184,8 +218,12 @@ class _PromptScreenState extends State<PromptScreen> {
                             const SizedBox(height: 4),
                             Text(
                               VerdictService.builtInVoice(_tone),
-                              style: display(13,
-                                  weight: 400, color: C.inkDim, height: 1.45),
+                              style: display(
+                                13,
+                                weight: 400,
+                                color: C.inkDim,
+                                height: 1.45,
+                              ),
                             ),
                           ],
                         ),
@@ -194,7 +232,8 @@ class _PromptScreenState extends State<PromptScreen> {
                         const SizedBox(height: 12),
                         const NoticeBanner(
                           title: 'No AI key yet',
-                          body: 'Custom voices only apply when an AI service is '
+                          body:
+                              'Custom voices only apply when an AI service is '
                               'writing the verdict. Offline verdicts use the '
                               'built-in lines.',
                           color: C.lime,
@@ -206,10 +245,14 @@ class _PromptScreenState extends State<PromptScreen> {
                 ),
               ),
               const SizedBox(height: 10),
-              PrimaryButton(
-                label: _busy ? 'Saving…' : 'Save prompt',
-                icon: _busy ? null : Icons.check_rounded,
-                onPressed: _busy ? null : _save,
+              Container(
+                color: C.bg,
+                padding: const EdgeInsets.only(top: 6),
+                child: PrimaryButton(
+                  label: _busy ? 'Saving…' : 'Save prompt',
+                  icon: _busy ? null : Icons.check_rounded,
+                  onPressed: _busy ? null : _save,
+                ),
               ),
             ],
           ),
@@ -255,8 +298,12 @@ class _ToneTab extends StatelessWidget {
           textAlign: TextAlign.center,
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
-          style: display(13,
-              weight: 600, color: selected ? C.bg : C.ink, height: 1.2),
+          style: display(
+            13,
+            weight: 600,
+            color: selected ? C.bg : C.ink,
+            height: 1.2,
+          ),
         ),
       ),
     );

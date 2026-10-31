@@ -58,20 +58,24 @@ class _ApiKeyScreenState extends State<ApiKeyScreen> {
   /// starts from the provider's usual suspects plus whatever was picked before.
   List<String> _listFor(AiProvider provider, String model) {
     final base = provider.fallbackModels;
-    return base.contains(model) ? base : [model, ...base.where((m) => m != model)];
+    return base.contains(model)
+        ? base
+        : [model, ...base.where((m) => m != model)];
   }
 
   /// Asks the provider which models this key may call, so we never offer one
   /// that answers with a 404.
   Future<List<String>?> _loadModels(String key, {bool quiet = false}) async {
-    if (key.trim().isEmpty || _provider == AiProvider.custom) return null;
+    if (_provider == AiProvider.custom) return null;
+    // The shared writer has no key to check; the proxy answers for itself.
+    if (_provider.requiresKey && key.trim().isEmpty) return null;
     if (!quiet) setState(() => _loadingModels = true);
     try {
       final models = await context.read<AppState>().fetchModels(
-            provider: _provider,
-            apiKey: key,
-            baseUrl: _baseUrl.text,
-          );
+        provider: _provider,
+        apiKey: key,
+        baseUrl: _baseUrl.text,
+      );
       if (!mounted) return models;
       setState(() {
         _models = models;
@@ -170,9 +174,9 @@ class _ApiKeyScreenState extends State<ApiKeyScreen> {
               (!state.settings.hasApiKey
                   ? 'Saved. No key, so offline verdicts are showing.'
                   : (state.verdict?.fromAi ?? false)
-                      ? '$_model works. Verdict written by ${_provider.label}.'
-                      : 'Saved. ${_provider.label} could not be reached, so '
-                          'offline verdicts are showing.'),
+                  ? '$_model works. Verdict written by ${_provider.label}.'
+                  : 'Saved. ${_provider.label} could not be reached, so '
+                        'offline verdicts are showing.'),
           style: display(14, weight: 500, color: C.ink),
         ),
       ),
@@ -197,20 +201,31 @@ class _ApiKeyScreenState extends State<ApiKeyScreen> {
               const SizedBox(height: 8),
               Expanded(
                 child: SingleChildScrollView(
+                  padding: const EdgeInsets.only(bottom: 8),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text('Who writes the verdict?',
-                          style: display(30,
-                              weight: 800, tracking: -0.035, height: 1.05)),
+                      Text(
+                        'Who writes the verdict?',
+                        style: display(
+                          30,
+                          weight: 800,
+                          tracking: -0.035,
+                          height: 1.05,
+                        ),
+                      ),
                       const SizedBox(height: 10),
                       Text(
                         'Hindsight does the counting on your phone. The words come '
                         'from a model you bring a key for. Without a key the '
                         'offline verdict still works — it just reuses the same '
                         'lines.',
-                        style: display(15,
-                            weight: 400, color: C.muted, height: 1.45),
+                        style: display(
+                          15,
+                          weight: 400,
+                          color: C.muted,
+                          height: 1.45,
+                        ),
                       ),
                       const SizedBox(height: 22),
                       const MonoLabel('Service'),
@@ -220,16 +235,30 @@ class _ApiKeyScreenState extends State<ApiKeyScreen> {
                         runSpacing: 8,
                         children: [
                           for (final provider in AiProvider.values)
-                            _PickChip(
-                              label: provider.label,
-                              selected: provider == _provider,
-                              onTap: () => _pick(provider),
-                            ),
+                            if (provider.available)
+                              _PickChip(
+                                label: provider.label,
+                                selected: provider == _provider,
+                                onTap: () => _pick(provider),
+                              ),
                         ],
                       ),
                       const SizedBox(height: 6),
-                      Text(_provider.blurb,
-                          style: mono(11, color: C.faint, tracking: 0.02)),
+                      Text(
+                        _provider.blurb,
+                        style: mono(11, color: C.faint, tracking: 0.02),
+                      ),
+                      if (!_provider.requiresKey) ...[
+                        const SizedBox(height: 14),
+                        const NoticeBanner(
+                          title: 'No key needed',
+                          body:
+                              'This build is wired to the Hindsight proxy, which '
+                              'holds the key. If it cannot be reached, the '
+                              'offline verdict is used.',
+                          icon: Icons.cloud_done_outlined,
+                        ),
+                      ],
                       if (_provider.needsBaseUrl) ...[
                         const SizedBox(height: 18),
                         const MonoLabel('Base URL'),
@@ -247,16 +276,22 @@ class _ApiKeyScreenState extends State<ApiKeyScreen> {
                             filled: true,
                             fillColor: C.surface,
                             contentPadding: const EdgeInsets.symmetric(
-                                horizontal: 16, vertical: 16),
+                              horizontal: 16,
+                              vertical: 16,
+                            ),
                             enabledBorder: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(16),
-                              borderSide:
-                                  const BorderSide(color: C.border, width: 1.5),
+                              borderSide: const BorderSide(
+                                color: C.border,
+                                width: 1.5,
+                              ),
                             ),
                             focusedBorder: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(16),
-                              borderSide:
-                                  const BorderSide(color: C.ink, width: 1.5),
+                              borderSide: const BorderSide(
+                                color: C.ink,
+                                width: 1.5,
+                              ),
                             ),
                           ),
                         ),
@@ -264,101 +299,125 @@ class _ApiKeyScreenState extends State<ApiKeyScreen> {
                         Text(
                           'Any OpenAI-compatible server: Ollama, LM Studio, '
                           'vLLM, or your own. Include /v1 if it needs it.',
-                          style: display(12.5,
-                              weight: 400, color: C.muted, height: 1.35),
+                          style: display(
+                            12.5,
+                            weight: 400,
+                            color: C.muted,
+                            height: 1.35,
+                          ),
                         ),
                       ],
                       const SizedBox(height: 18),
-                      MonoLabel('${_provider.label} API key'),
-                      const SizedBox(height: 8),
-                      TextField(
-                        controller: _key,
-                        obscureText: !_reveal,
-                        style: mono(14, color: C.ink, tracking: 0.02),
-                        cursorColor: C.lime,
-                        autocorrect: false,
-                        enableSuggestions: false,
-                        onSubmitted: (_) => _loadModels(_key.text),
-                        decoration: InputDecoration(
-                          hintText: _provider.keyHint,
-                          hintStyle: mono(14, color: C.faint),
-                          filled: true,
-                          fillColor: C.surface,
-                          contentPadding: const EdgeInsets.symmetric(
-                              horizontal: 16, vertical: 18),
-                          suffixIcon: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              if (_loadingModels)
-                                const Padding(
-                                  padding: EdgeInsets.only(right: 4),
-                                  child: SizedBox(
-                                    width: 14,
-                                    height: 14,
-                                    child: CircularProgressIndicator(
-                                      strokeWidth: 2,
-                                      valueColor:
-                                          AlwaysStoppedAnimation(C.orange),
+                      if (_provider.requiresKey) ...[
+                        MonoLabel('${_provider.label} API key'),
+                        const SizedBox(height: 8),
+                        TextField(
+                          controller: _key,
+                          obscureText: !_reveal,
+                          style: mono(14, color: C.ink, tracking: 0.02),
+                          cursorColor: C.lime,
+                          autocorrect: false,
+                          enableSuggestions: false,
+                          onSubmitted: (_) => _loadModels(_key.text),
+                          decoration: InputDecoration(
+                            hintText: _provider.keyHint,
+                            hintStyle: mono(14, color: C.faint),
+                            filled: true,
+                            fillColor: C.surface,
+                            contentPadding: const EdgeInsets.symmetric(
+                              horizontal: 16,
+                              vertical: 18,
+                            ),
+                            suffixIcon: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                if (_loadingModels)
+                                  const Padding(
+                                    padding: EdgeInsets.only(right: 4),
+                                    child: SizedBox(
+                                      width: 14,
+                                      height: 14,
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 2,
+                                        valueColor: AlwaysStoppedAnimation(
+                                          C.orange,
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                IconButton(
+                                  onPressed: () =>
+                                      setState(() => _reveal = !_reveal),
+                                  icon: Icon(
+                                    _reveal
+                                        ? Icons.visibility_off
+                                        : Icons.visibility,
+                                    size: 20,
+                                    color: C.muted,
+                                  ),
+                                ),
+                              ],
+                            ),
+                            enabledBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(16),
+                              borderSide: const BorderSide(
+                                color: C.border,
+                                width: 1.5,
+                              ),
+                            ),
+                            focusedBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(16),
+                              borderSide: const BorderSide(
+                                color: C.ink,
+                                width: 1.5,
+                              ),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 10),
+                        if (_provider.keysUrl.isNotEmpty)
+                          GestureDetector(
+                            onTap: () {
+                              Clipboard.setData(
+                                ClipboardData(text: _provider.keysUrl),
+                              );
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  backgroundColor: C.surface2,
+                                  content: Text(
+                                    '${_provider.keysUrl} copied',
+                                    style: display(
+                                      14,
+                                      weight: 500,
+                                      color: C.ink,
                                     ),
                                   ),
                                 ),
-                              IconButton(
-                                onPressed: () =>
-                                    setState(() => _reveal = !_reveal),
-                                icon: Icon(
-                                  _reveal
-                                      ? Icons.visibility_off
-                                      : Icons.visibility,
-                                  size: 20,
-                                  color: C.muted,
+                              );
+                            },
+                            behavior: HitTestBehavior.opaque,
+                            child: Row(
+                              children: [
+                                const Icon(
+                                  Icons.key_outlined,
+                                  size: 16,
+                                  color: C.lime,
                                 ),
-                              ),
-                            ],
-                          ),
-                          enabledBorder: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(16),
-                            borderSide:
-                                const BorderSide(color: C.border, width: 1.5),
-                          ),
-                          focusedBorder: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(16),
-                            borderSide: const BorderSide(color: C.ink, width: 1.5),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 10),
-                      if (_provider.keysUrl.isNotEmpty)
-                        GestureDetector(
-                          onTap: () {
-                            Clipboard.setData(
-                              ClipboardData(text: _provider.keysUrl),
-                            );
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(
-                                backgroundColor: C.surface2,
-                                content: Text(
-                                    '${_provider.keysUrl} copied',
-                                    style: display(14,
-                                        weight: 500, color: C.ink)),
-                              ),
-                            );
-                          },
-                          behavior: HitTestBehavior.opaque,
-                          child: Row(
-                            children: [
-                              const Icon(Icons.key_outlined,
-                                  size: 16, color: C.lime),
-                              const SizedBox(width: 8),
-                              Expanded(
-                                child: Text(
-                                  'Get a key at ${_provider.keysUrl.replaceFirst('https://', '')} · stored on this phone only',
-                                  style: display(13,
-                                      weight: 400, color: C.muted),
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  child: Text(
+                                    'Get a key at ${_provider.keysUrl.replaceFirst('https://', '')} · stored on this phone only',
+                                    style: display(
+                                      13,
+                                      weight: 400,
+                                      color: C.muted,
+                                    ),
+                                  ),
                                 ),
-                              ),
-                            ],
+                              ],
+                            ),
                           ),
-                        ),
+                      ],
                       if (_modelsError != null) ...[
                         const SizedBox(height: 14),
                         NoticeBanner(
@@ -384,16 +443,22 @@ class _ApiKeyScreenState extends State<ApiKeyScreen> {
                             filled: true,
                             fillColor: C.surface,
                             contentPadding: const EdgeInsets.symmetric(
-                                horizontal: 16, vertical: 16),
+                              horizontal: 16,
+                              vertical: 16,
+                            ),
                             enabledBorder: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(16),
-                              borderSide:
-                                  const BorderSide(color: C.border, width: 1.5),
+                              borderSide: const BorderSide(
+                                color: C.border,
+                                width: 1.5,
+                              ),
                             ),
                             focusedBorder: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(16),
-                              borderSide:
-                                  const BorderSide(color: C.ink, width: 1.5),
+                              borderSide: const BorderSide(
+                                color: C.ink,
+                                width: 1.5,
+                              ),
                             ),
                           ),
                         ),
@@ -401,8 +466,12 @@ class _ApiKeyScreenState extends State<ApiKeyScreen> {
                         Text(
                           'The model name your server expects, exactly as it '
                           'lists it.',
-                          style: display(12.5,
-                              weight: 400, color: C.muted, height: 1.35),
+                          style: display(
+                            12.5,
+                            weight: 400,
+                            color: C.muted,
+                            height: 1.35,
+                          ),
                         ),
                       ] else ...[
                         Row(
@@ -444,13 +513,14 @@ class _ApiKeyScreenState extends State<ApiKeyScreen> {
                           behavior: HitTestBehavior.opaque,
                           child: Container(
                             constraints: const BoxConstraints(minHeight: 54),
-                            padding:
-                                const EdgeInsets.symmetric(horizontal: 16),
+                            padding: const EdgeInsets.symmetric(horizontal: 16),
                             child: Row(
                               children: [
                                 Expanded(
-                                  child: Text('Voice prompt',
-                                      style: display(15, weight: 600)),
+                                  child: Text(
+                                    'Voice prompt',
+                                    style: display(15, weight: 600),
+                                  ),
                                 ),
                                 Text(
                                   customCount == 0
@@ -459,14 +529,18 @@ class _ApiKeyScreenState extends State<ApiKeyScreen> {
                                   style: mono(12, tracking: 0.02),
                                 ),
                                 const SizedBox(width: 6),
-                                const Icon(Icons.chevron_right,
-                                    size: 18, color: C.muted),
+                                const Icon(
+                                  Icons.chevron_right,
+                                  size: 18,
+                                  color: C.muted,
+                                ),
                               ],
                             ),
                           ),
                         ),
                       ),
-                      if (settings.apiKeys.containsKey(_provider.id)) ...[
+                      if (_provider.requiresKey &&
+                          settings.apiKeys.containsKey(_provider.id)) ...[
                         const SizedBox(height: 20),
                         GestureDetector(
                           onTap: () async {
@@ -487,11 +561,20 @@ class _ApiKeyScreenState extends State<ApiKeyScreen> {
                           behavior: HitTestBehavior.opaque,
                           child: Row(
                             children: [
-                              const Icon(Icons.close, size: 18, color: C.orange),
+                              const Icon(
+                                Icons.close,
+                                size: 18,
+                                color: C.orange,
+                              ),
                               const SizedBox(width: 8),
-                              Text('Remove ${_provider.label} key',
-                                  style: display(14,
-                                      weight: 700, color: C.orange)),
+                              Text(
+                                'Remove ${_provider.label} key',
+                                style: display(
+                                  14,
+                                  weight: 700,
+                                  color: C.orange,
+                                ),
+                              ),
                             ],
                           ),
                         ),
@@ -500,10 +583,16 @@ class _ApiKeyScreenState extends State<ApiKeyScreen> {
                   ),
                 ),
               ),
-              PrimaryButton(
-                label: _busy ? 'Checking…' : 'Save and test',
-                icon: _busy ? null : Icons.bolt,
-                onPressed: _busy ? null : _saveAndTest,
+              // A solid footer, so the form scrolls against a visible edge
+              // instead of sliding under the pill.
+              Container(
+                color: C.bg,
+                padding: const EdgeInsets.only(top: 14),
+                child: PrimaryButton(
+                  label: _busy ? 'Checking…' : 'Save and test',
+                  icon: _busy ? null : Icons.bolt,
+                  onPressed: _busy ? null : _saveAndTest,
+                ),
               ),
             ],
           ),
@@ -539,17 +628,18 @@ class _PickChip extends StatelessWidget {
         decoration: BoxDecoration(
           color: selected ? C.ink : C.surface,
           borderRadius: BorderRadius.circular(22),
-          border: Border.all(
-            color: selected ? C.ink : C.border,
-            width: 1.5,
-          ),
+          border: Border.all(color: selected ? C.ink : C.border, width: 1.5),
         ),
         child: Text(
           label,
           style: monospace
               ? mono(12, color: selected ? C.bg : C.ink, tracking: 0.02)
-              : display(14,
-                  weight: 600, color: selected ? C.bg : C.ink, height: 1.2),
+              : display(
+                  14,
+                  weight: 600,
+                  color: selected ? C.bg : C.ink,
+                  height: 1.2,
+                ),
         ),
       ),
     );

@@ -8,19 +8,19 @@ extension ToneX on Tone {
   String get id => name;
 
   String get label => switch (this) {
-        Tone.coach => 'Gentle coach',
-        Tone.roast => 'Brutal roast',
-        Tone.future => 'Future you',
-      };
+    Tone.coach => 'Gentle coach',
+    Tone.roast => 'Brutal roast',
+    Tone.future => 'Future you',
+  };
 
   String get blurb => switch (this) {
-        Tone.coach =>
-          'You have more time than you think. Here is what it could build.',
-        Tone.roast =>
-          'Three hours of strangers dancing. Your portfolio sends its regards.',
-        Tone.future =>
-          'I am you in five years. Remember that thing you stopped building?',
-      };
+    Tone.coach =>
+      'You have more time than you think. Here is what it could build.',
+    Tone.roast =>
+      'Three hours of strangers dancing. Your portfolio sends its regards.',
+    Tone.future =>
+      'I am you in five years. Remember that thing you stopped building?',
+  };
 
   static Tone parse(String? s) {
     switch (s) {
@@ -123,12 +123,15 @@ class UsageData {
     final out = <DaySlice>[];
     m.forEach((appId, minutes) {
       if (minutes <= 0) return;
-      final meta = apps[appId] ?? AppMeta(id: appId, name: appId, initials: '?');
-      out.add(DaySlice(
-        meta: meta,
-        minutes: minutes,
-        tag: tags[appId] ?? AppTag.neutral,
-      ));
+      final meta =
+          apps[appId] ?? AppMeta(id: appId, name: appId, initials: '?');
+      out.add(
+        DaySlice(
+          meta: meta,
+          minutes: minutes,
+          tag: tags[appId] ?? AppTag.neutral,
+        ),
+      );
     });
     out.sort((a, b) => b.minutes.compareTo(a.minutes));
     return out;
@@ -168,8 +171,7 @@ class UsageData {
 
   /// Minutes reclaimed for the goal: time spent on productive apps this week.
   int reclaimedWeek(DateTime today, Map<String, AppTag> tags) {
-    return week(today, tags)
-        .fold<int>(0, (sum, d) => sum + d.productive);
+    return week(today, tags).fold<int>(0, (sum, d) => sum + d.productive);
   }
 
   int wastedWeek(DateTime today, Map<String, AppTag> tags) {
@@ -216,7 +218,7 @@ class AppSettings {
     this.wastedLimitMinutes = 240,
     this.notifyEnabled = true,
     this.notifyAtMinutes = 22 * 60,
-    this.provider = AiProvider.groq,
+    AiProvider? provider,
     Map<String, String>? apiKeys,
     Map<String, String>? models,
     Map<Tone, String>? voicePrompts,
@@ -224,11 +226,12 @@ class AppSettings {
     Map<String, AppTag>? tags,
     this.setupComplete = false,
     Set<String>? coachSeen,
-  })  : apiKeys = apiKeys ?? <String, String>{},
-        models = models ?? <String, String>{},
-        voicePrompts = voicePrompts ?? <Tone, String>{},
-        tags = tags ?? <String, AppTag>{},
-        coachSeen = coachSeen ?? <String>{};
+  }) : provider = provider ?? AiProviderX.defaultProvider,
+       apiKeys = apiKeys ?? <String, String>{},
+       models = models ?? <String, String>{},
+       voicePrompts = voicePrompts ?? <Tone, String>{},
+       tags = tags ?? <String, AppTag>{},
+       coachSeen = coachSeen ?? <String>{};
 
   static const defaultModel = 'openai/gpt-oss-120b';
 
@@ -271,7 +274,9 @@ class AppSettings {
 
   String get apiKey => apiKeys[provider.id] ?? '';
 
-  bool get hasApiKey => apiKey.trim().isNotEmpty;
+  /// The shared writer needs no key; anything else needs one pasted in.
+  bool get hasApiKey =>
+      provider.requiresKey ? apiKey.trim().isNotEmpty : provider.available;
 
   String get model => models[provider.id] ?? provider.fallbackModels.first;
 
@@ -290,19 +295,19 @@ class AppSettings {
   }
 
   AppSettings copy() => AppSettings(
-        tone: tone,
-        goal: goal,
-        paceMinutes: paceMinutes,
-        wastedLimitMinutes: wastedLimitMinutes,
-        notifyEnabled: notifyEnabled,
-        notifyAtMinutes: notifyAtMinutes,
-        provider: provider,
-        apiKeys: Map<String, String>.from(apiKeys),
-        models: Map<String, String>.from(models),
-        voicePrompts: Map<Tone, String>.from(voicePrompts),
-        customBaseUrl: customBaseUrl,
-        tags: Map<String, AppTag>.from(tags),
-        setupComplete: setupComplete,
-        coachSeen: {...coachSeen},
-      );
+    tone: tone,
+    goal: goal,
+    paceMinutes: paceMinutes,
+    wastedLimitMinutes: wastedLimitMinutes,
+    notifyEnabled: notifyEnabled,
+    notifyAtMinutes: notifyAtMinutes,
+    provider: provider,
+    apiKeys: Map<String, String>.from(apiKeys),
+    models: Map<String, String>.from(models),
+    voicePrompts: Map<Tone, String>.from(voicePrompts),
+    customBaseUrl: customBaseUrl,
+    tags: Map<String, AppTag>.from(tags),
+    setupComplete: setupComplete,
+    coachSeen: {...coachSeen},
+  );
 }

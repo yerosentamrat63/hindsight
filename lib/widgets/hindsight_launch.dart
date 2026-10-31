@@ -13,7 +13,6 @@
 // finishes after a short pause.
 
 import 'dart:math' as math;
-import 'dart:ui' show ImageFilter;
 
 import 'package:flutter/material.dart';
 
@@ -182,7 +181,9 @@ class _HindsightLaunchState extends State<HindsightLaunch>
                   return Stack(
                     children: [
                       Positioned.fill(
-                        child: CustomPaint(painter: _LaunchPainter(n)),
+                        child: RepaintBoundary(
+                          child: CustomPaint(painter: _LaunchPainter(n)),
+                        ),
                       ),
                       Positioned(
                         left: 0,
@@ -221,31 +222,34 @@ class _HindsightLaunchState extends State<HindsightLaunch>
     final base = _wordStyle;
     final style =
         base.copyWith(letterSpacing: base.fontSize! * _lerp(.5, -.03, f));
-    Widget t = ClipRect(
-      clipper: _RevealFromRight(f),
-      child: Text('Hindsight', textAlign: TextAlign.center, style: style),
+    // The board blurs the word in as it wipes. A per-frame blur is a full
+    // offscreen pass on a low-end GPU, and it was the heaviest thing on screen
+    // during launch, so the wipe carries the entry on its own. Isolated so the
+    // rest of the launch screen is not re-rasterised with it.
+    return RepaintBoundary(
+      child: Opacity(
+        opacity: f,
+        child: ClipRect(
+          clipper: _RevealFromRight(f),
+          child: Text('Hindsight', textAlign: TextAlign.center, style: style),
+        ),
+      ),
     );
-    final sigma = _lerp(8, 0, f);
-    if (sigma > .05) {
-      t = ImageFiltered(
-        imageFilter: ImageFilter.blur(sigmaX: sigma, sigmaY: sigma),
-        child: t,
-      );
-    }
-    return Opacity(opacity: f, child: t);
   }
 
   Widget _buildTagline(double n) {
     final f = _seg(n, .66, .74, _easeSpin);
     if (f <= 0) return const SizedBox.shrink();
-    return Opacity(
-      opacity: f,
-      child: Transform.translate(
-        offset: Offset(0, 8 * (1 - f)),
-        child: Text(
-          widget.tagline,
-          textAlign: TextAlign.center,
-          style: _monoStyle(12, 12 * .16, _muted),
+    return RepaintBoundary(
+      child: Opacity(
+        opacity: f,
+        child: Transform.translate(
+          offset: Offset(0, 8 * (1 - f)),
+          child: Text(
+            widget.tagline,
+            textAlign: TextAlign.center,
+            style: _monoStyle(12, 12 * .16, _muted),
+          ),
         ),
       ),
     );
@@ -255,33 +259,37 @@ class _HindsightLaunchState extends State<HindsightLaunch>
     final show = _seg(n, .56, .62);
     if (show <= 0) return const SizedBox.shrink();
     final fill = _seg(n, .58, .88, _easeDraw);
-    return Opacity(
-      opacity: show,
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Text(widget.progressLabel, style: _monoStyle(11, 11 * .08, _muted)),
-          const SizedBox(height: 10),
-          ClipRRect(
-            borderRadius: BorderRadius.circular(2),
-            child: SizedBox(
-              width: 120,
-              height: 3,
-              child: Stack(
-                children: [
-                  const Positioned.fill(child: ColoredBox(color: _track)),
-                  Positioned.fill(
-                    child: FractionallySizedBox(
-                      alignment: Alignment.centerLeft,
-                      widthFactor: fill,
-                      child: const ColoredBox(color: _lime),
+    return RepaintBoundary(
+      child: Opacity(
+        opacity: show,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(widget.progressLabel,
+                style: _monoStyle(11, 11 * .08, _muted)),
+            const SizedBox(height: 10),
+            ClipRRect(
+              borderRadius: BorderRadius.circular(2),
+              child: SizedBox(
+                width: 120,
+                height: 3,
+                child: Stack(
+                  children: [
+                    const Positioned.fill(child: ColoredBox(color: _track)),
+                    Positioned.fill(
+                      // Scaling the fill avoids a layout pass every frame.
+                      child: Transform(
+                        alignment: Alignment.centerLeft,
+                        transform: Matrix4.diagonal3Values(fill, 1, 1),
+                        child: const ColoredBox(color: _lime),
+                      ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }

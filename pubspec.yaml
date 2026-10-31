@@ -29,3 +29,12 @@ flutter:
     - family: JetBrainsMono
       fonts:
         - asset: assets/fonts/JetBrainsMono.ttf
+    # The home-screen widget artboards name their families in full. Both ship
+    # the variable font, so the widgets can pin wght and opsz per size the way
+    # the boards' CSS does.
+    - family: Bricolage Grotesque
+      fonts:
+        - asset: assets/fonts/BricolageGrotesque.ttf
+    - family: JetBrains Mono
+      fonts:
+        - asset: assets/fonts/JetBrainsMono.ttf

@@ -35,26 +35,28 @@ Future<AppState> _state() async {
 }
 
 VerdictContext _context({Tone tone = Tone.roast}) => VerdictContext(
-      tone: tone,
-      goal: 'UI/UX designer',
-      paceMinutes: 60,
-      wastedToday: 273,
-      neutralToday: 52,
-      productiveToday: 47,
-      wastedWeek: 2079,
-      wastedPrevWeek: 2292,
-      limitMinutes: 240,
-      opensToday: 142,
-      topApps: const [
-        AppLine(name: 'TikTok', minutes: 160, tag: AppTag.wasted),
-      ],
-    );
+  tone: tone,
+  goal: 'UI/UX designer',
+  paceMinutes: 60,
+  wastedToday: 273,
+  neutralToday: 52,
+  productiveToday: 47,
+  wastedWeek: 2079,
+  wastedPrevWeek: 2292,
+  limitMinutes: 240,
+  opensToday: 142,
+  topApps: const [AppLine(name: 'TikTok', minutes: 160, tag: AppTag.wasted)],
+);
 
 String _verdictJson() =>
     '{"headline":"H","body":"B with 4h 33m.","one_liner":"O"}';
 
 void main() {
-  setUp(() => SharedPreferences.setMockInitialValues({}));
+  setUp(() {
+    SharedPreferences.setMockInitialValues({});
+    // Tests run in the public build shape unless one says otherwise.
+    HindsightCloud.baseUrl = '';
+  });
 
   test('a fresh install can tag an app', () async {
     final state = await _state();
@@ -160,7 +162,10 @@ void main() {
 
     expect(verdict.fromAi, isTrue);
     expect(verdict.body, contains('4h 33m'));
-    expect(sent!.url.toString(), 'https://api.groq.com/openai/v1/chat/completions');
+    expect(
+      sent!.url.toString(),
+      'https://api.groq.com/openai/v1/chat/completions',
+    );
     expect(sent!.headers['Authorization'], 'Bearer gsk_test');
 
     final body = jsonDecode(sent!.body) as Map<String, dynamic>;
@@ -205,7 +210,10 @@ void main() {
 
     final gemini = VerdictService(
       client: MockClient((request) async {
-        expect(request.url.path, contains('/models/gemini-2.0-flash:generateContent'));
+        expect(
+          request.url.path,
+          contains('/models/gemini-2.0-flash:generateContent'),
+        );
         expect(request.url.queryParameters['key'], 'AIza-test');
         return http.Response(
           jsonEncode({
@@ -259,12 +267,83 @@ void main() {
       }),
     );
 
-    final models = await service.fetchModels(const AiEndpoint(
-      provider: AiProvider.gemini,
-      apiKey: 'AIza-test',
-      model: 'gemini-2.0-flash',
-    ));
+    final models = await service.fetchModels(
+      const AiEndpoint(
+        provider: AiProvider.gemini,
+        apiKey: 'AIza-test',
+        model: 'gemini-2.0-flash',
+      ),
+    );
     expect(models, ['gemini-2.0-flash']);
+  });
+
+  test('a build with a proxy writes with no key', () async {
+    HindsightCloud.baseUrl = 'https://verdict.example.workers.dev/v1';
+    addTearDown(() => HindsightCloud.baseUrl = '');
+
+    expect(AiProvider.hindsight.available, isTrue);
+    expect(AiProvider.hindsight.requiresKey, isFalse);
+
+    final settings = AppSettings(provider: AiProvider.hindsight);
+    expect(settings.apiKey, isEmpty);
+    expect(settings.hasApiKey, isTrue);
+    expect(settings.endpointUrl, 'https://verdict.example.workers.dev/v1');
+    expect(settings.model, 'openai/gpt-oss-120b');
+
+    // A fresh install starts on the shared writer.
+    final fresh = await _state();
+    expect(fresh.settings.provider, AiProvider.hindsight);
+    expect(fresh.settings.hasApiKey, isTrue);
+  });
+
+  test('the shared writer calls the proxy and sends no key', () async {
+    HindsightCloud.baseUrl = 'https://verdict.example.workers.dev/v1';
+    addTearDown(() => HindsightCloud.baseUrl = '');
+
+    http.Request? sent;
+    final service = VerdictService(
+      client: MockClient((request) async {
+        sent = request;
+        return http.Response(
+          jsonEncode({
+            'choices': [
+              {
+                'message': {'content': _verdictJson()},
+                'finish_reason': 'stop',
+              },
+            ],
+          }),
+          200,
+        );
+      }),
+    );
+
+    final verdict = await service.generate(
+      _context(),
+      ep: const AiEndpoint(
+        provider: AiProvider.hindsight,
+        apiKey: '',
+        model: 'openai/gpt-oss-120b',
+      ),
+      dayKey: 20261029,
+    );
+
+    expect(verdict.fromAi, isTrue);
+    expect(
+      sent!.url.toString(),
+      'https://verdict.example.workers.dev/v1/chat/completions',
+    );
+    final body = jsonDecode(sent!.body) as Map<String, dynamic>;
+    // gpt-oss models must be told not to spend the budget thinking.
+    expect(body['reasoning_effort'], 'low');
+  });
+
+  test('without a proxy the shared writer is not offered', () {
+    HindsightCloud.baseUrl = '';
+    expect(AiProvider.hindsight.available, isFalse);
+    expect(AppSettings(provider: AiProvider.hindsight).hasApiKey, isFalse);
+    expect(AiProviderX.parse('hindsight'), AiProvider.groq);
+    expect(AppSettings().provider, AiProvider.groq);
   });
 
   test('a rejected key says so in words', () async {
@@ -273,11 +352,13 @@ void main() {
     );
 
     expect(
-      () => service.fetchModels(const AiEndpoint(
-        provider: AiProvider.openai,
-        apiKey: 'sk-wrong',
-        model: 'gpt-4o-mini',
-      )),
+      () => service.fetchModels(
+        const AiEndpoint(
+          provider: AiProvider.openai,
+          apiKey: 'sk-wrong',
+          model: 'gpt-4o-mini',
+        ),
+      ),
       throwsA(
         isA<VerdictException>().having(
           (e) => e.message,

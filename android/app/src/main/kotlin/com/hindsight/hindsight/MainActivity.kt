@@ -13,6 +13,7 @@ import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
 import java.util.Calendar
+import java.util.concurrent.Executors
 import kotlin.math.max
 
 /**
@@ -23,6 +24,20 @@ import kotlin.math.max
  */
 class MainActivity : FlutterActivity() {
     private val channelName = "hindsight/usage"
+
+    /**
+     * UsageStats walks 14 days of per-app stats and resolves a label for every
+     * package it finds. That is a lot of PackageManager work; on the UI thread
+     * it stalls the launch animation, so the query runs here and only the reply
+     * hops back to the main thread.
+     */
+    private val io = Executors.newSingleThreadExecutor()
+
+    /** Only touched from [io]; app labels never change while the app runs. */
+    private val labelCache = HashMap<String, String>()
+
+    @Volatile
+    private var destroyed = false
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
@@ -40,10 +55,17 @@ class MainActivity : FlutterActivity() {
                     }
                     "queryUsage" -> {
                         val days = call.argument<Int>("days") ?: 14
-                        try {
-                            result.success(queryUsage(days))
-                        } catch (e: Exception) {
-                            result.error("query_failed", e.message, null)
+                        io.execute {
+                            try {
+                                val usage = queryUsage(days)
+                                runOnUiThread { if (!destroyed) result.success(usage) }
+                            } catch (e: Exception) {
+                                runOnUiThread {
+                                    if (!destroyed) {
+                                        result.error("query_failed", e.message, null)
+                                    }
+                                }
+                            }
                         }
                     }
                     else -> result.notImplemented()
@@ -60,10 +82,37 @@ class MainActivity : FlutterActivity() {
                         if (json == null) {
                             result.error("bad_args", "expected a JSON snapshot", null)
                         } else {
-                            WidgetStore.save(this, json)
+                            // The snapshot has no layout to fill any more: the
+                            // widgets show PNGs the app draws in Dart.
                             WidgetStore.refreshAll(this)
                             result.success(null)
                         }
+                    }
+                    "updateImages" -> {
+                        val paths = call.arguments as? Map<*, *>
+                        if (paths == null) {
+                            result.error("bad_args", "expected a map of image paths", null)
+                        } else {
+                            val json = org.json.JSONObject()
+                            paths.forEach { (key, value) ->
+                                json.put(key.toString(), value.toString())
+                            }
+                            WidgetStore.saveImages(this, json.toString())
+                            WidgetStore.refreshAll(this)
+                            result.success(null)
+                        }
+                    }
+                    "sizes" -> {
+                        val json = org.json.JSONObject()
+                        WidgetStore.sizes(this).forEach { (key, box) ->
+                            json.put(
+                                key,
+                                org.json.JSONArray()
+                                    .put(box[0].toDouble())
+                                    .put(box[1].toDouble())
+                            )
+                        }
+                        result.success(json.toString())
                     }
                     else -> result.notImplemented()
                 }
@@ -137,6 +186,12 @@ class MainActivity : FlutterActivity() {
             )
         }
         return mode == AppOpsManager.MODE_ALLOWED
+    }
+
+    override fun onDestroy() {
+        destroyed = true
+        io.shutdown()
+        super.onDestroy()
     }
 
     private fun queryUsage(days: Int): Map<String, Any> {
@@ -292,12 +347,17 @@ class MainActivity : FlutterActivity() {
     }
 
     private fun appLabel(pkg: String): String {
-        return try {
+        // isSystemNoise asks for the label of every stat of every day, so the
+        // same handful of packages used to be resolved 14 times over.
+        labelCache[pkg]?.let { return it }
+        val label = try {
             val info = packageManager.getApplicationInfo(pkg, 0)
             packageManager.getApplicationLabel(info).toString()
         } catch (e: Exception) {
             pkg.substringAfterLast('.').replaceFirstChar { it.uppercase() }
         }
+        labelCache[pkg] = label
+        return label
     }
 
     private fun initialOf(label: String): String {

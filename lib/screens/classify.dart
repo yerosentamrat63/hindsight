@@ -17,9 +17,11 @@ class ClassifyList extends StatelessWidget {
   Widget build(BuildContext context) {
     final state = context.watch<AppState>();
     final entries = state.usage.apps.values.toList()
-      ..sort((a, b) =>
-          state.usage.weekMinutes(b.id, state.today)
-              .compareTo(state.usage.weekMinutes(a.id, state.today)));
+      ..sort(
+        (a, b) => state.usage
+            .weekMinutes(b.id, state.today)
+            .compareTo(state.usage.weekMinutes(a.id, state.today)),
+      );
 
     final rows = maxRows == null ? entries : entries.take(maxRows!).toList();
 
@@ -29,7 +31,8 @@ class ClassifyList extends StatelessWidget {
       child: Column(
         children: [
           for (var i = 0; i < rows.length; i++) ...[
-            if (i > 0) const Divider(height: 1, thickness: 1, color: C.hairline),
+            if (i > 0)
+              const Divider(height: 1, thickness: 1, color: C.hairline),
             _ClassifyRow(meta: rows[i]),
           ],
         ],
@@ -61,12 +64,13 @@ class _ClassifyRow extends StatelessWidget {
               mainAxisAlignment: MainAxisAlignment.center,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(meta.name,
-                    style: display(15, weight: 600, tracking: -0.01),
-                    overflow: TextOverflow.ellipsis),
+                Text(
+                  meta.name,
+                  style: display(15, weight: 600, tracking: -0.01),
+                  overflow: TextOverflow.ellipsis,
+                ),
                 const SizedBox(height: 1),
-                Text('${dur(perDay)} / day',
-                    style: mono(11, tracking: 0.02)),
+                Text('${dur(perDay)} / day', style: mono(11, tracking: 0.02)),
               ],
             ),
           ),
@@ -152,8 +156,10 @@ class ClassifyScreen extends StatelessWidget {
             children: [
               const BackHeader(),
               const SizedBox(height: 8),
-              Text('Which of these are a waste?',
-                  style: display(30, weight: 800, tracking: -0.035, height: 1.05)),
+              Text(
+                'Which of these are a waste?',
+                style: display(30, weight: 800, tracking: -0.035, height: 1.05),
+              ),
               const SizedBox(height: 8),
               Text(
                 'Tap a tag to change it. This keeps the verdicts fair.',
@@ -168,10 +174,14 @@ class ClassifyScreen extends StatelessWidget {
                   child: ClassifyList(),
                 ),
               ),
-              PrimaryButton(
-                label: 'Save',
-                icon: Icons.check_rounded,
-                onPressed: () => Navigator.of(context).pop(),
+              Container(
+                color: C.bg,
+                padding: const EdgeInsets.only(top: 14),
+                child: PrimaryButton(
+                  label: 'Save',
+                  icon: Icons.check_rounded,
+                  onPressed: () => Navigator.of(context).pop(),
+                ),
               ),
             ],
           ),
