@@ -82,8 +82,8 @@ class MainActivity : FlutterActivity() {
                         if (json == null) {
                             result.error("bad_args", "expected a JSON snapshot", null)
                         } else {
-                            // The snapshot has no layout to fill any more: the
-                            // widgets show PNGs the app draws in Dart.
+                            // The numbers behind the widgets; the evening reminder reads them.
+                            WidgetStore.saveSnapshot(this, json)
                             WidgetStore.refreshAll(this)
                             result.success(null)
                         }
@@ -194,42 +194,35 @@ class MainActivity : FlutterActivity() {
         super.onDestroy()
     }
 
+    private fun startOfDay(offsetDays: Int = 0): Long {
+        val c = Calendar.getInstance()
+        c.set(Calendar.HOUR_OF_DAY, 0)
+        c.set(Calendar.MINUTE, 0)
+        c.set(Calendar.SECOND, 0)
+        c.set(Calendar.MILLISECOND, 0)
+        if (offsetDays != 0) {
+            c.add(Calendar.DAY_OF_YEAR, offsetDays)
+        }
+        return c.timeInMillis
+    }
+
     private fun queryUsage(days: Int): Map<String, Any> {
         val manager = getSystemService(Context.USAGE_STATS_SERVICE) as UsageStatsManager
-        val calendar = Calendar.getInstance()
-        calendar.set(Calendar.HOUR_OF_DAY, 0)
-        calendar.set(Calendar.MINUTE, 0)
-        calendar.set(Calendar.SECOND, 0)
-        calendar.set(Calendar.MILLISECOND, 0)
-        val todayStart = calendar.timeInMillis
+        val todayStart = startOfDay(0)
+        val tomorrowStart = startOfDay(1)
 
         val apps = LinkedHashMap<String, Any>()
         val daily = LinkedHashMap<String, Any>()
         val totals = HashMap<String, Int>()
 
         val span = max(days, 1)
-        for (offset in span - 1 downTo 0) {
-            val dayStart = todayStart - offset * DAY_MS
-            val dayEnd = dayStart + DAY_MS
-            val dayKey = dayKey(dayStart)
-            val row = LinkedHashMap<String, Any>()
+        val rows = dailyRows(manager, span)
 
-            val stats = manager.queryUsageStats(
-                UsageStatsManager.INTERVAL_DAILY,
-                dayStart,
-                dayEnd
-            ) ?: emptyList()
-
-            for (stat in stats) {
-                val pkg = stat.packageName ?: continue
-                if (isSystemNoise(pkg)) continue
-                val minutes = (stat.totalTimeInForeground / 60000L).toInt()
-                if (minutes <= 0) continue
-                row[pkg] = minutes
+        for ((key, row) in rows) {
+            daily[key] = row
+            row.forEach { (pkg, minutes) ->
                 totals[pkg] = (totals[pkg] ?: 0) + minutes
             }
-
-            if (row.isNotEmpty()) daily[dayKey] = row
         }
 
         // Only the apps that mattered, biggest first, so the payload stays small.
@@ -250,7 +243,7 @@ class MainActivity : FlutterActivity() {
 
         val opens = LinkedHashMap<String, Int>()
         val hourly = LinkedHashMap<String, List<Int>>()
-        readToday(manager, todayStart, todayStart + DAY_MS, labels, opens, hourly)
+        readToday(manager, todayStart, tomorrowStart, labels, opens, hourly)
 
         return mapOf(
             "apps" to apps,
@@ -258,6 +251,64 @@ class MainActivity : FlutterActivity() {
             "opens" to opens,
             "hourly" to hourly
         )
+    }
+
+    /**
+     * Per-day foreground minutes in one pass. UsageStats daily buckets end at
+     * midnight, so `lastTimeStamp - 1` keeps each row on the day it covers.
+     * Some OEM builds ignore the interval and collapse the range into a single
+     * bucket; those fall back to one query per day.
+     */
+    private fun dailyRows(
+        manager: UsageStatsManager,
+        span: Int
+    ): LinkedHashMap<String, LinkedHashMap<String, Int>> {
+        val begin = startOfDay(-(span - 1))
+        val end = startOfDay(1)
+        val rows = LinkedHashMap<String, LinkedHashMap<String, Int>>()
+
+        val stats = manager.queryUsageStats(
+            UsageStatsManager.INTERVAL_DAILY,
+            begin,
+            end
+        ) ?: emptyList()
+
+        for (stat in stats) {
+            val pkg = stat.packageName ?: continue
+            // Filter by id only here: resolving a label for every package of
+            // every day was the slow part of the old query.
+            if (isNoiseId(pkg)) continue
+            val minutes = (stat.totalTimeInForeground / 60000L).toInt()
+            if (minutes <= 0) continue
+            val stamp = stat.lastTimeStamp - 1
+            if (stamp < begin) continue
+            val row = rows.getOrPut(dayKey(stamp)) { LinkedHashMap() }
+            row[pkg] = (row[pkg] ?: 0) + minutes
+        }
+
+        if (rows.size <= 1 && span > 1) {
+            rows.clear()
+            for (offset in span - 1 downTo 0) {
+                val dayStart = startOfDay(-offset)
+                val dayEnd = startOfDay(-offset + 1)
+                val row = LinkedHashMap<String, Int>()
+                val dayStats = manager.queryUsageStats(
+                    UsageStatsManager.INTERVAL_DAILY,
+                    dayStart,
+                    dayEnd
+                ) ?: continue
+                for (stat in dayStats) {
+                    val pkg = stat.packageName ?: continue
+                    if (isNoiseId(pkg)) continue
+                    val minutes = (stat.totalTimeInForeground / 60000L).toInt()
+                    if (minutes <= 0) continue
+                    row[pkg] = (row[pkg] ?: 0) + minutes
+                }
+                if (row.isNotEmpty()) rows[dayKey(dayStart)] = row
+            }
+        }
+
+        return rows
     }
 
     /** Counts opens and foreground minutes per hour for today. */
@@ -317,15 +368,11 @@ class MainActivity : FlutterActivity() {
         }
     }
 
-    /**
-     * Launchers, the system UI, permission dialogs and Hindsight itself are not
-     * "screen time": showing "One UI Home · 2h" tells the user nothing and
-     * pollutes the wasted total.
-     */
-    private fun isSystemNoise(pkg: String, label: String? = null): Boolean {
+    /** Noise that is identifiable from the package id alone (no label lookup). */
+    private fun isNoiseId(pkg: String): Boolean {
         if (pkg == packageName || pkg == "android") return true
         val id = pkg.lowercase()
-        if (id.contains("launcher") ||
+        return id.contains("launcher") ||
             id.contains("systemui") ||
             id.contains("system.ui") ||
             id.contains("setupwizard") ||
@@ -333,9 +380,15 @@ class MainActivity : FlutterActivity() {
             id.contains("packageinstaller") ||
             id.equals("com.android.settings") ||
             id.endsWith(".settings")
-        ) {
-            return true
-        }
+    }
+
+    /**
+     * Launchers, the system UI, permission dialogs and Hindsight itself are not
+     * "screen time": showing "One UI Home A� 2h" tells the user nothing and
+     * pollutes the wasted total.
+     */
+    private fun isSystemNoise(pkg: String, label: String? = null): Boolean {
+        if (isNoiseId(pkg)) return true
         val name = (label ?: appLabel(pkg)).lowercase().trim()
         return name == "one ui home" ||
             name == "system ui" ||
@@ -394,7 +447,6 @@ class MainActivity : FlutterActivity() {
     }
 
     companion object {
-        private const val DAY_MS = 24L * 60L * 60L * 1000L
         private const val HOUR_MS = 60L * 60L * 1000L
         private const val NOTIFICATION_REQUEST = 4141
     }

@@ -29,7 +29,7 @@ const DAILY_CAP = 300;
 
 const CORS = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, content-type',
+  'Access-Control-Allow-Headers': 'authorization, content-type, x-hindsight-token',
   'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
 };
 
@@ -40,6 +40,9 @@ export default {
     }
     if (!env.GROQ_API_KEY) {
       return fail('This proxy has no Groq key configured.', 500);
+    }
+    if (env.CLIENT_TOKEN && request.headers.get('x-hindsight-token') !== env.CLIENT_TOKEN) {
+      return fail('Unauthorized client.', 401);
     }
 
     const { pathname } = new URL(request.url);

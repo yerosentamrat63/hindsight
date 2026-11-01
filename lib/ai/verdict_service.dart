@@ -170,7 +170,12 @@ Rules:
       case ApiStyle.openai:
         return _client.get(
           Uri.parse('$base/models'),
-          headers: {'Authorization': 'Bearer $key'},
+          headers: {
+            if (key.isNotEmpty) 'Authorization': 'Bearer $key',
+            if (ep.provider == AiProvider.hindsight &&
+                HindsightCloud.token.isNotEmpty)
+              'x-hindsight-token': HindsightCloud.token,
+          },
         );
       case ApiStyle.anthropic:
         return _client.get(
@@ -272,7 +277,10 @@ Rules:
         return _client.post(
           Uri.parse('$base/chat/completions'),
           headers: {
-            'Authorization': 'Bearer $key',
+            if (key.isNotEmpty) 'Authorization': 'Bearer $key',
+            if (ep.provider == AiProvider.hindsight &&
+                HindsightCloud.token.isNotEmpty)
+              'x-hindsight-token': HindsightCloud.token,
             'Content-Type': 'application/json',
           },
           body: jsonEncode({

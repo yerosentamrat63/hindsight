@@ -21,6 +21,7 @@ class HindsightCloud {
   HindsightCloud._();
 
   static String baseUrl = const String.fromEnvironment('HINDSIGHT_PROXY');
+  static String token = const String.fromEnvironment('HINDSIGHT_TOKEN');
 
   static bool get configured => baseUrl.trim().isNotEmpty;
 }

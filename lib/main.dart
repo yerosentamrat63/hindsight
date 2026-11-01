@@ -13,7 +13,6 @@ import 'screens/verdict.dart';
 import 'store.dart';
 import 'theme.dart';
 import 'widgets/coachmark.dart';
-import 'widgets/hindsight_launch.dart';
 import 'widgets/widget_png.dart';
 import 'widgets/ui.dart';
 
@@ -48,27 +47,7 @@ class HindsightApp extends StatelessWidget {
       // PNGs, so they keep the app's fonts (see widgets/widget_png.dart).
       builder: (context, child) =>
           WidgetPngHost(child: child ?? const SizedBox.shrink()),
-      home: const AppBoot(),
-    );
-  }
-}
-
-/// Plays the designed launch animation while the app boots, then fades into
-/// [RootGate]. The animation is skippable with a tap and honours the OS
-/// "remove animations" setting.
-class AppBoot extends StatelessWidget {
-  const AppBoot({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return LaunchGate(
-      ready: context.read<AppState>().ready,
-      child: const RootGate(),
-      launchBuilder: (onFinished) => HindsightLaunch(
-        onFinished: onFinished,
-        wordmarkStyle: display(46, weight: 800),
-        monoStyle: mono(12, color: C.muted),
-      ),
+      home: const RootGate(),
     );
   }
 }

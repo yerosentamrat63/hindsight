@@ -368,4 +368,26 @@ void main() {
       ),
     );
   });
+
+  test('api keys are encrypted when stored in preferences', () async {
+    final state = await _state();
+    await state.saveAiConfig(
+      provider: AiProvider.openai,
+      apiKey: 'sk-secret-key-12345',
+      model: 'gpt-4o-mini',
+    );
+
+    // In memory, it remains the readable API key
+    expect(state.settings.apiKey, 'sk-secret-key-12345');
+
+    // On disk in SharedPreferences, it is encrypted and never plain
+    final prefs = await SharedPreferences.getInstance();
+    final raw = prefs.getString('settings.v1')!;
+    expect(raw, isNot(contains('sk-secret-key-12345')));
+    expect(raw, contains('enc:v1:'));
+
+    // Re-loading from disk decrypts correctly
+    final reloaded = await _state();
+    expect(reloaded.settings.apiKey, 'sk-secret-key-12345');
+  });
 }

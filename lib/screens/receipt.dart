@@ -53,6 +53,17 @@ class _ReceiptScreenState extends State<ReceiptScreen> {
     try {
       final bytes = await renderReceiptPng(context, paper);
       final dir = await getTemporaryDirectory();
+      try {
+        final oldReceipts = dir
+            .listSync()
+            .whereType<File>()
+            .where((f) => f.path.contains('hindsight-receipt-'));
+        for (final old in oldReceipts) {
+          try {
+            old.deleteSync();
+          } catch (_) {}
+        }
+      } catch (_) {}
       final file = File(
         '${dir.path}/hindsight-receipt-${DateTime.now().millisecondsSinceEpoch}.png',
       );
@@ -192,9 +203,13 @@ Future<Uint8List> renderReceiptPng(
         as RenderRepaintBoundary?;
     if (boundary == null) throw StateError('receipt not mounted');
     final image = await boundary.toImage(pixelRatio: pixelRatio);
-    final data = await image.toByteData(format: ui.ImageByteFormat.png);
-    if (data == null) throw StateError('empty image');
-    return data.buffer.asUint8List();
+    try {
+      final data = await image.toByteData(format: ui.ImageByteFormat.png);
+      if (data == null) throw StateError('empty image');
+      return data.buffer.asUint8List();
+    } finally {
+      image.dispose();
+    }
   } finally {
     entry.remove();
   }

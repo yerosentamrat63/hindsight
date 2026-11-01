@@ -9,6 +9,7 @@ import 'ai/milestones.dart';
 import 'ai/providers.dart';
 import 'ai/verdict_context.dart';
 import 'ai/verdict_service.dart';
+import 'data/key_vault.dart';
 import 'data/reminders.dart';
 import 'data/usage_repository.dart';
 import 'format.dart';
@@ -23,16 +24,12 @@ class AppState extends ChangeNotifier {
         _verdicts = verdicts ?? VerdictService();
 
   static const _settingsKey = 'settings.v1';
+  static const _widgetSnapshotKey = 'widgets.snapshot.v1';
   static const _verdictPrefix = 'verdict.';
 
   final UsageRepository _repo;
   final VerdictService _verdicts;
   SharedPreferences? _prefs;
-
-  /// Completes once [init] has loaded everything; the launch animation holds
-  /// its last frame until then so the home screen never appears half-built.
-  final Completer<void> _ready = Completer<void>();
-  Future<void> get ready => _ready.future;
 
   AppSettings settings = AppSettings();
   UsageData usage = UsageData.empty();
@@ -57,28 +54,36 @@ class AppState extends ChangeNotifier {
   // ---------------------------------------------------------------- lifecycle
 
   Future<void> init() async {
-    _prefs = await SharedPreferences.getInstance();
-    _loadSettings();
-    hasUsageAccess = await _repo.hasAccess();
-    usage = await _repo.load();
-    _loadCachedVerdict();
-    notificationsAllowed = await Reminders.hasPermission();
-    exactAlarmsAllowed = await Reminders.canScheduleExact();
-    // A reminder that is already switched on still needs Android's permission
-    // before it can post anything. Ask once, here, so the 22:00 alarm is not
-    // armed invisibly on Android 13+.
-    if (settings.setupComplete && settings.notifyEnabled && !notificationsAllowed) {
-      await Reminders.requestPermission();
+    try {
+      _prefs = await SharedPreferences.getInstance();
+      _loadSettings();
+      hasUsageAccess = await _repo.hasAccess();
+      usage = await _repo.load();
+      _loadCachedVerdict();
+      notificationsAllowed = await Reminders.hasPermission();
+      exactAlarmsAllowed = await Reminders.canScheduleExact();
+      // A reminder that is already switched on still needs Android's permission
+      // before it can post anything. Ask once, here, so the 22:00 alarm is not
+      // armed invisibly on Android 13+.
+      if (settings.setupComplete &&
+          settings.notifyEnabled &&
+          !notificationsAllowed) {
+        await Reminders.requestPermission();
+      }
+      await _syncReminder();
+    } finally {
+      loading = false;
+      notifyListeners();
     }
-    // The launcher widgets are redrawn by a bitmap pass on the Android UI
-    // thread. Do that while the launch animation is holding its last frame
-    // rather than during the cross-fade into the home screen, where it showed
-    // up as a stutter at the very end of the animation.
+    // The launcher widgets are five offscreen paints and PNG encodes. That is
+    // not boot: doing it here used to delay the home screen. Paint them once
+    // the home screen has settled instead.
+    if (!HomeWidgets.isTest) unawaited(_publishWidgetsLater());
+  }
+
+  Future<void> _publishWidgetsLater() async {
+    await Future<void>.delayed(const Duration(seconds: 2));
     await _publishWidgets();
-    await _syncReminder();
-    loading = false;
-    notifyListeners();
-    if (!_ready.isCompleted) _ready.complete();
   }
 
   // ----------------------------------------------------------------- widgets
@@ -86,7 +91,7 @@ class AppState extends ChangeNotifier {
   /// Everything the home-screen widgets draw, in one flat snapshot.
   Map<String, Object?> widgetSnapshot() {
     final summary = todaySummary;
-    final yesterdayKey = dayKeyOf(today.subtract(const Duration(days: 1)));
+    final yesterdayKey = dayKeyOf(dayOffset(today, -1));
     final days = usage.lastDays(today, 7).map(dateFromKey).toList();
     final week = this.week;
     final top = todaySlices.take(3).toList();
@@ -126,10 +131,18 @@ class AppState extends ChangeNotifier {
 
   Future<void> _publishWidgets() async {
     final snapshot = widgetSnapshot();
+    // Drawing and encoding five PNGs stalls the UI thread for most of a
+    // second. Skip it when nothing the widgets show has changed since the
+    // last publish; `updated` changes every snapshot and is ignored here.
+    final fingerprint = jsonEncode(
+      Map<String, Object?>.of(snapshot)..remove('updated'),
+    );
+    if (_prefs?.getString(_widgetSnapshotKey) == fingerprint) return;
     // The native layouts only carry an image, so draw the widgets first and
     // then ask the launcher to reload them.
     await WidgetPngHost.push(widgetDataFromSnapshot(snapshot));
     await HomeWidgets.publish(snapshot);
+    await _prefs?.setString(_widgetSnapshotKey, fingerprint);
   }
 
   void _loadSettings() {
@@ -147,11 +160,12 @@ class AppState extends ChangeNotifier {
       final rawKeys = j['apiKeys'];
       if (rawKeys is Map) {
         rawKeys.forEach((k, v) {
-          if (v.toString().trim().isNotEmpty) apiKeys[k.toString()] = v.toString();
+          final decrypted = KeyVault.decrypt(v.toString());
+          if (decrypted.isNotEmpty) apiKeys[k.toString()] = decrypted;
         });
       }
       // Older installs stored a single Groq key and model.
-      final oldKey = (j['apiKey'] ?? '').toString().trim();
+      final oldKey = KeyVault.decrypt((j['apiKey'] ?? '').toString());
       if (apiKeys.isEmpty && oldKey.isNotEmpty) apiKeys[AiProvider.groq.id] = oldKey;
 
       final models = <String, String>{};
@@ -206,7 +220,11 @@ class AppState extends ChangeNotifier {
       'notify': settings.notifyEnabled,
       'notifyAt': settings.notifyAtMinutes,
       'provider': settings.provider.id,
-      'apiKeys': settings.apiKeys,
+      'apiKeys': {
+        for (final entry in settings.apiKeys.entries)
+          if (entry.value.trim().isNotEmpty)
+            entry.key: KeyVault.encrypt(entry.value),
+      },
       'models': settings.models,
       'prompts': settings.voicePrompts.map((k, v) => MapEntry(k.id, v)),
       'baseUrl': settings.customBaseUrl,
@@ -618,6 +636,11 @@ class AppState extends ChangeNotifier {
   }
 
   Future<void> refreshUsage() async {
+    final now = dateOnly(DateTime.now());
+    if (now != today) {
+      today = now;
+      _loadCachedVerdict();
+    }
     hasUsageAccess = await _repo.hasAccess();
     usage = await _repo.load();
     notifyListeners();
@@ -633,7 +656,11 @@ class AppState extends ChangeNotifier {
     await _prefs?.clear();
     settings = AppSettings();
     verdict = null;
+    _verdictBasis = null;
+    verdictError = null;
     today = dateOnly(DateTime.now());
+    await Reminders.sync(enabled: false, atMinutes: settings.notifyAtMinutes);
+    await HomeWidgets.publish({});
     usage = await _repo.load();
     notifyListeners();
   }

@@ -25,7 +25,7 @@ class TodayScreen extends StatelessWidget {
     final summary = state.todaySummary;
     final slices = state.todaySlices;
     final yesterday = state.usage.totalOn(
-      dayKeyOf(state.today.subtract(const Duration(days: 1))),
+      dayKeyOf(dayOffset(state.today, -1)),
     );
     final delta = summary.total - yesterday;
     final top = slices.take(5).toList();

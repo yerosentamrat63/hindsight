@@ -47,7 +47,7 @@ UsageData buildSampleUsage({DateTime? now}) {
 
   final daily = <int, Map<String, int>>{};
   for (var i = 0; i < series.length; i++) {
-    final date = today.subtract(Duration(days: series.length - 1 - i));
+    final date = dayOffset(today, -(series.length - 1 - i));
     final wasted = series[i];
     final neutral = (wasted * 0.19).round();
     final productive = (wasted * 0.172).round();

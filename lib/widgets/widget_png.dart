@@ -52,6 +52,7 @@ class _WidgetPngHostState extends State<WidgetPngHost> {
   };
 
   WidgetData? _data;
+  WidgetData? _pendingData;
   Map<String, Size> _cells = const {};
   bool _busy = false;
 
@@ -68,13 +69,21 @@ class _WidgetPngHostState extends State<WidgetPngHost> {
   }
 
   Future<void> capture(WidgetData data) async {
-    if (!mounted) return;
-    // One pass at a time; a second refresh waits rather than racing.
-    while (_busy) {
-      await Future<void>.delayed(const Duration(milliseconds: 50));
-      if (!mounted) return;
-    }
+    _pendingData = data;
+    if (_busy || !mounted) return;
     _busy = true;
+    try {
+      while (_pendingData != null && mounted) {
+        final current = _pendingData!;
+        _pendingData = null;
+        await _renderAndPublish(current);
+      }
+    } finally {
+      _busy = false;
+    }
+  }
+
+  Future<void> _renderAndPublish(WidgetData data) async {
     try {
       final cells = await HomeWidgets.sizes();
       if (!mounted) return;
@@ -109,7 +118,6 @@ class _WidgetPngHostState extends State<WidgetPngHost> {
       debugPrint('Hindsight: widget capture failed: $error\n$stack');
     } finally {
       if (mounted) setState(() => _data = null);
-      _busy = false;
     }
   }
 

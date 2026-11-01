@@ -89,8 +89,8 @@ class _HistoryScreenState extends State<HistoryScreen> {
         : summaries.reduce((a, b) => a.wasted <= b.wasted ? a : b);
     final underLimit = summaries.where((s) => s.wasted <= limit).length;
     final yesterdayWasted = state.usage
-        .summaryOn(dayKeyOf(state.today.subtract(const Duration(days: 1))),
-            state.today.subtract(const Duration(days: 1)), tags)
+        .summaryOn(dayKeyOf(dayOffset(state.today, -1)),
+            dayOffset(state.today, -1), tags)
         .wasted;
     final dayShare = summaries.first.total <= 0
         ? 0

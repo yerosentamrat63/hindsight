@@ -78,6 +78,10 @@ int dayKeyOf(DateTime d) => d.year * 10000 + d.month * 100 + d.day;
 
 DateTime dateOnly(DateTime d) => DateTime(d.year, d.month, d.day);
 
+/// Shifts a date by calendar days without DST duration drift.
+DateTime dayOffset(DateTime d, int offsetDays) =>
+    DateTime(d.year, d.month, d.day + offsetDays);
+
 DateTime dateFromKey(int key) =>
     DateTime(key ~/ 10000, (key ~/ 100) % 100, key % 100);
 

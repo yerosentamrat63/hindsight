@@ -1,6 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hindsight/data/sample_usage.dart';
 import 'package:hindsight/data/usage_repository.dart';
+import 'package:hindsight/format.dart';
 import 'package:hindsight/models.dart';
 import 'package:hindsight/store.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -61,5 +62,42 @@ void main() {
 
     await state.resetCoachTips();
     expect(state.settings.coachSeen, isEmpty);
+  });
+
+  test('dayOffset shifts calendar days correctly across month boundaries', () {
+    final nov1 = DateTime(2026, 11, 1);
+    final oct31 = dayOffset(nov1, -1);
+    expect(oct31.year, 2026);
+    expect(oct31.month, 10);
+    expect(oct31.day, 31);
+    expect(dayKeyOf(oct31), 20261031);
+  });
+
+  test('refreshUsage advances today when day shifts across midnight', () async {
+    final state = AppState(repo: _DemoUsage());
+    await state.init();
+
+    // Artificially simulate that state was initialized yesterday
+    state.today = dayOffset(state.today, -1);
+    final yesterday = state.today;
+
+    await state.refreshUsage();
+    expect(state.today, isNot(yesterday));
+    expect(state.today, dateOnly(DateTime.now()));
+  });
+
+  test('deleteAllData resets state, settings, and cached verdict basis', () async {
+    final state = AppState(repo: _DemoUsage());
+    await state.init();
+    await state.setGoal('Mobile Architect');
+    await state.generateVerdict();
+
+    expect(state.settings.goal, 'Mobile Architect');
+    expect(state.verdict, isNotNull);
+
+    await state.deleteAllData();
+    expect(state.settings.goal, 'UI/UX designer');
+    expect(state.verdict, isNull);
+    expect(state.verdictStale, isFalse);
   });
 }

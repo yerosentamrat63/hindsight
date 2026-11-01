@@ -15,11 +15,11 @@ class HomeWidgets {
 
   /// Nothing answers this channel under `flutter test`, and a pending platform
   /// call would hang the test binding, so tests skip it entirely.
-  static bool get _isTest =>
+  static bool get isTest =>
       !kIsWeb && Platform.environment['FLUTTER_TEST'] == 'true';
 
   static Future<void> publish(Map<String, Object?> snapshot) async {
-    if (kIsWeb || _isTest || defaultTargetPlatform != TargetPlatform.android) {
+    if (kIsWeb || isTest || defaultTargetPlatform != TargetPlatform.android) {
       return;
     }
     try {
@@ -34,7 +34,7 @@ class HomeWidgets {
   /// The size each placed widget's cell actually has, in dp, so the widgets are
   /// drawn at the shape the launcher will show instead of the board's artboard.
   static Future<Map<String, Size>> sizes() async {
-    if (kIsWeb || _isTest || defaultTargetPlatform != TargetPlatform.android) {
+    if (kIsWeb || isTest || defaultTargetPlatform != TargetPlatform.android) {
       return const {};
     }
     try {
@@ -62,7 +62,7 @@ class HomeWidgets {
   /// so [WidgetPngHost] draws each widget with Flutter and the provider only
   /// shows the file.
   static Future<void> publishImages(Map<String, String> paths) async {
-    if (kIsWeb || _isTest || defaultTargetPlatform != TargetPlatform.android) {
+    if (kIsWeb || isTest || defaultTargetPlatform != TargetPlatform.android) {
       return;
     }
     try {
